@@ -123,16 +123,15 @@ def detect_lane2(rgb_img, state_id=None):
     ])
 
     img = helper2.undistort_img(rgb_img)
-    img = helper.region_of_interest(img, [region])
     img = helper.gaussian_blur(img, 5)
+    img = helper2.edge_detection(img)
+    img = helper.region_of_interest(img, [region])
     img = helper2.bird_eye_view(img, region.astype('float32'), w, h)
-    img = helper2.edge_detection(img, True)
 
-    # thresh = (0, 255)
-    # binary = np.zeros_like(S)
-    # binary[(S > thresh[0]) & (S <= thresh[1])] = 1
-    # img.dtype = 'uint8'
-    # img = helper.canny(img, 10, 30)
+    histogram = np.sum(img[img.shape[0]//2:,:], axis=0)
+    plt.plot(histogram)
+    plt.show()
+
 
     return img
 

@@ -53,7 +53,7 @@ def sobel_thres(img, sobel_kernel=3):
     dir_bin[condition] = 1
 
     combined_bin = np.zeros_like(img)
-    condition = ((mag_bin == 1) | (dir_bin == 1))
+    condition = (mag_bin == 1) | (dir_bin == 1) | (img == 1)
     combined_bin[condition] = 255
 
     return np.dstack([combined_bin] * 3)
@@ -63,7 +63,6 @@ def edge_detection(rgb_img, s_only=False):
     R = rgb_img[:, :, 0]
     r_binary = binary_thres(R)
     r_edge = sobel_thres(r_binary)  # helper.canny(img)
-    return r_edge
 
     hls = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HLS)
     S = hls[:, :, 2]
@@ -75,7 +74,7 @@ def edge_detection(rgb_img, s_only=False):
     if not s_only:
         final = final // 2 + r_edge // 2
 
-    return np.dstack([final] * 3)
+    return final
 
 
 def undistort_img(img):
@@ -85,9 +84,7 @@ def undistort_img(img):
     return cv2.undistort(img, mtx, dist, None, None)
 
 
-def bird_eye_view(img, src_corners, w, h, offset=50):
-    print('W', w)
-    print('H', h)
+def bird_eye_view(img, src_corners, w, h, offset=10):
     dst_corners = np.array([(offset, offset), (w - offset, offset),
                             (w - offset, h - offset),
                             (offset, h - offset)]).astype('float32')
