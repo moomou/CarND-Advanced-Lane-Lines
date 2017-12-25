@@ -15,9 +15,14 @@ def grayscale(img):
     # return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
 
-def canny(img, low_threshold, high_threshold):
-    """Applies the Canny transform"""
-    return cv2.Canny(img, low_threshold, high_threshold)
+def canny(img, sigma=0.33):
+    """Applies the Canny transform
+    Ref: https://www.pyimagesearch.com/2015/04/06/zero-parameter-automatic-canny-edge-detection-with-python-and-opencv/
+    """
+    m = np.median(img)
+    lower = int(max(0, (1.0 - sigma) * m))
+    upper = int(min(255, (1.0 + sigma) * m))
+    return cv2.Canny(img, lower, upper)
 
 
 def gaussian_blur(img, kernel_size):

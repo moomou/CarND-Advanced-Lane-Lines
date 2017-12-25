@@ -10,6 +10,7 @@ import numpy as np
 from PIL import Image
 
 import helper
+import helper2
 import util
 from importlib import reload
 
@@ -98,31 +99,64 @@ def detect_lane(rgb_img, state_id=None):
 def detect_lane2(rgb_img, state_id=None):
     '''
     The goals / steps of this project are the following:
-        Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
-        Apply a distortion correction to raw images.
-        Use color transforms, gradients, etc., to create a thresholded binary image.
-        Apply a perspective transform to rectify binary image ("birds-eye view").
+        x Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
+        x Apply a distortion correction to raw images.
+        x Use color transforms, gradients, etc., to create a thresholded binary image.
+        x Apply a perspective transform to rectify binary image ("birds-eye view").
         Detect lane pixels and fit to find the lane boundary.
         Determine the curvature of the lane and vehicle position with respect to center.
         Warp the detected lane boundaries back onto the original image.
         Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
     '''
-    pass
+    global _state_cache
+
+    h, w, chan = rgb_img.shape
+    region = np.array([
+        # top left
+        (int(w / 2) - 100, int(h / 2) + 100),
+        # top right
+        (int(w / 2) + 100, int(h / 2) + 100),
+        # bottom right
+        (int(w * 0.8), int(h * 0.85)),
+        # bottom left
+        (int(w * 0.2), int(h * 0.85)),
+    ])
+
+    img = helper2.undistort_img(rgb_img)
+    img = helper.region_of_interest(img, [region])
+    img = helper.gaussian_blur(img, 5)
+    img = helper2.bird_eye_view(img, region.astype('float32'), w, h)
+    img = helper2.edge_detection(img, True)
+
+    # thresh = (0, 255)
+    # binary = np.zeros_like(S)
+    # binary[(S > thresh[0]) & (S <= thresh[1])] = 1
+    # img.dtype = 'uint8'
+    # img = helper.canny(img, 10, 30)
+
+    return img
 
 
-def process_image(img_root='test_images'):
-    for img in os.listdir(img_root):
-        image = mpimg.imread(os.path.join(img_root, img))
-        img_array = detect_lane(image)
+def process_image(output_root='./output_images',
+                  img_root='test_images',
+                  debug=True):
+    test_imgs = os.listdir(img_root)
+    if debug:
+        test_imgs = test_imgs[:3]
 
-        im = Image.fromarray(img_array)
-        im.save(os.path.join(img_root + '_output', img))
+    for path in test_imgs:
+        img = mpimg.imread(os.path.join(img_root, path))
+        img = detect_lane2(img)
+
+        cv2.imwrite(
+            os.path.join(output_root, path),
+            cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
 
 if __name__ == '__main__':
     import fire
 
     fire.Fire({
-        'img': process_image,
+        'proc': process_image,
         'cam': cam_calibration,
     })
