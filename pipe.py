@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import glob
+from importlib import reload
 from collections import defaultdict
 
 import cv2
@@ -12,11 +13,14 @@ from PIL import Image
 import helper
 import helper2
 import util
-from importlib import reload
+from line import Line
 
 helper = reload(helper)
 util = reload(util)
+
 _state_cache = defaultdict(dict)
+right_lane = None
+left_lane = None
 
 # Checkerboard pattern corners
 NX = 9
@@ -108,7 +112,7 @@ def lane_pipe(rgb_img, state_id=None):
         Warp the detected lane boundaries back onto the original image.
         Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
     '''
-    global _state_cache
+    global _state_cache, left_lane, right_lane
 
     h, w, chan = rgb_img.shape
     region = np.array([
@@ -126,9 +130,17 @@ def lane_pipe(rgb_img, state_id=None):
     img = helper.gaussian_blur(img, 5)
     img = helper2.edge_detection(img)
     img = helper.region_of_interest(img, [region])
-    img = helper2.bird_eye_view(img, region.astype('float32'), w, h)
+    img, M, inv_M = helper2.bird_eye_view(img, region.astype('float32'), w, h)
 
-    helper2.detect_lane(img, debug_lv=2)
+    left_lane, right_lane = helper2.detect_lane(
+        img, left_lane, right_lane, debug_lv=2)
+    curavture_rad, center_offset = helper2.cal_curvature_and_center_pos(
+        left_lane, right_lane)
+
+    img = helper2.draw_lanes(rgb_img, inv_M, img, left_lane, right_lane, w, h)
+    img = helper2.draw_text(
+        'Est. curvature = %s\n Est. center offset = %s\n' % curavture_rad,
+        center_offset)
 
     return img
 

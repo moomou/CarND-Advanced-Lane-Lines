@@ -90,12 +90,83 @@ def bird_eye_view(img, src_corners, w, h, offset=10):
                             (w - offset, h - offset),
                             (offset, h - offset)]).astype('float32')
     M = cv2.getPerspectiveTransform(src_corners, dst_corners)
+    inv_M = cv2.getPerspectiveTransform(dst_corners, src_corners)
     dst = cv2.warpPerspective(img, M, (w, h))
 
-    return dst
+    return dst, M, inv_M
 
 
-def detect_lane(bin_img, margin=200, minpix=90, debug_lv=0):
+def _detect_lane_from_fit(bin_img, left_fit, right_fit, margin=200,
+                          debug_lv=0):
+    # Assume you now have a new warped binary image
+    # from the next frame of video (also called "bin_img")
+    # It's now much easier to find line pixels!
+    nonzero = bin_img.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+
+    left_lane_inds = (
+        (nonzerox >
+         (left_fit[0] *
+          (nonzeroy**2) + left_fit[1] * nonzeroy + left_fit[2] - margin)) &
+        (nonzerox <
+         (left_fit[0] *
+          (nonzeroy**2) + left_fit[1] * nonzeroy + left_fit[2] + margin)))
+
+    right_lane_inds = (
+        (nonzerox >
+         (right_fit[0] *
+          (nonzeroy**2) + right_fit[1] * nonzeroy + right_fit[2] - margin)) &
+        (nonzerox <
+         (right_fit[0] *
+          (nonzeroy**2) + right_fit[1] * nonzeroy + right_fit[2] + margin)))
+
+    # Again, extract left and right line pixel positions
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds]
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds]
+    # Fit a second order polynomial to each
+    left_fit = np.polyfit(lefty, leftx, 2)
+    right_fit = np.polyfit(righty, rightx, 2)
+    # Generate x and y values for plotting
+    ploty = np.linspace(0, bin_img.shape[0] - 1, bin_img.shape[0])
+    left_fitx = left_fit[0] * ploty**2 + left_fit[1] * ploty + left_fit[2]
+    right_fitx = right_fit[0] * ploty**2 + right_fit[1] * ploty + right_fit[2]
+
+    # Create an image to draw on and an image to show the selection window
+    out_img = np.dstack((bin_img, bin_img, bin_img)) * 255
+    window_img = np.zeros_like(out_img)
+    # Color in left and right line pixels
+    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+
+    # Generate a polygon to illustrate the search window area
+    # And recast the x and y points into usable format for cv2.fillPoly()
+    left_line_window1 = np.array(
+        [np.transpose(np.vstack([left_fitx - margin, ploty]))])
+    left_line_window2 = np.array(
+        [np.flipud(np.transpose(np.vstack([left_fitx + margin, ploty])))])
+    left_line_pts = np.hstack((left_line_window1, left_line_window2))
+    right_line_window1 = np.array(
+        [np.transpose(np.vstack([right_fitx - margin, ploty]))])
+    right_line_window2 = np.array(
+        [np.flipud(np.transpose(np.vstack([right_fitx + margin, ploty])))])
+    right_line_pts = np.hstack((right_line_window1, right_line_window2))
+
+    # Draw the lane onto the warped blank image
+    cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
+    cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
+    result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
+    plt.imshow(result)
+
+    plt.plot(left_fitx, ploty, color='yellow')
+    plt.plot(right_fitx, ploty, color='yellow')
+    plt.xlim(0, 1280)
+    plt.ylim(720, 0)
+
+
+def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
     out_img = np.copy(bin_img)
 
     histogram = np.sum(bin_img[bin_img.shape[0] // 2:, :, 0], axis=0)
@@ -188,70 +259,70 @@ def detect_lane(bin_img, margin=200, minpix=90, debug_lv=0):
         plt.show()
 
 
-def detect_lane_from_fit(bin_img, left_fit, right_fit, margin=200, debug_lv=0):
-    # Assume you now have a new warped binary image
-    # from the next frame of video (also called "bin_img")
-    # It's now much easier to find line pixels!
-    nonzero = bin_img.nonzero()
-    nonzeroy = np.array(nonzero[0])
-    nonzerox = np.array(nonzero[1])
+def detect_lane(bin_img,
+                left_lane,
+                right_lane,
+                margin=200,
+                minpix=90,
+                debug_lv=0):
+    pass
 
-    left_lane_inds = (
-        (nonzerox >
-         (left_fit[0] *
-          (nonzeroy**2) + left_fit[1] * nonzeroy + left_fit[2] - margin)) &
-        (nonzerox <
-         (left_fit[0] *
-          (nonzeroy**2) + left_fit[1] * nonzeroy + left_fit[2] + margin)))
 
-    right_lane_inds = (
-        (nonzerox >
-         (right_fit[0] *
-          (nonzeroy**2) + right_fit[1] * nonzeroy + right_fit[2] - margin)) &
-        (nonzerox <
-         (right_fit[0] *
-          (nonzeroy**2) + right_fit[1] * nonzeroy + right_fit[2] + margin)))
+def cal_curvature_and_center_pos(ploty, leftx, rightx):
+    # Define conversions in x and y from pixels space to meters
+    ym_per_pix = 30 / 720  # meters per pixel in y dimension
+    xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
 
-    # Again, extract left and right line pixel positions
-    leftx = nonzerox[left_lane_inds]
-    lefty = nonzeroy[left_lane_inds]
-    rightx = nonzerox[right_lane_inds]
-    righty = nonzeroy[right_lane_inds]
-    # Fit a second order polynomial to each
-    left_fit = np.polyfit(lefty, leftx, 2)
-    right_fit = np.polyfit(righty, rightx, 2)
-    # Generate x and y values for plotting
-    ploty = np.linspace(0, bin_img.shape[0] - 1, bin_img.shape[0])
-    left_fitx = left_fit[0] * ploty**2 + left_fit[1] * ploty + left_fit[2]
-    right_fitx = right_fit[0] * ploty**2 + right_fit[1] * ploty + right_fit[2]
+    y_eval = np.max(ploty)
 
-    # Create an image to draw on and an image to show the selection window
-    out_img = np.dstack((bin_img, bin_img, bin_img)) * 255
-    window_img = np.zeros_like(out_img)
-    # Color in left and right line pixels
-    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+    # Fit new polynomials to x,y in world space
+    left_fit_cr = np.polyfit(ploty * ym_per_pix, leftx * xm_per_pix, 2)
+    right_fit_cr = np.polyfit(ploty * ym_per_pix, rightx * xm_per_pix, 2)
+    # Calculate the new radii of curvature
+    left_curverad = ((
+        1 + (2 * left_fit_cr[0] * y_eval * ym_per_pix + left_fit_cr[1])**2)**
+                     1.5) / np.absolute(2 * left_fit_cr[0])
+    right_curverad = ((
+        1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1])**2)**
+                      1.5) / np.absolute(2 * right_fit_cr[0])
 
-    # Generate a polygon to illustrate the search window area
-    # And recast the x and y points into usable format for cv2.fillPoly()
-    left_line_window1 = np.array(
-        [np.transpose(np.vstack([left_fitx - margin, ploty]))])
-    left_line_window2 = np.array(
-        [np.flipud(np.transpose(np.vstack([left_fitx + margin, ploty])))])
-    left_line_pts = np.hstack((left_line_window1, left_line_window2))
-    right_line_window1 = np.array(
-        [np.transpose(np.vstack([right_fitx - margin, ploty]))])
-    right_line_window2 = np.array(
-        [np.flipud(np.transpose(np.vstack([right_fitx + margin, ploty])))])
-    right_line_pts = np.hstack((right_line_window1, right_line_window2))
+    # Now our radius of curvature is in meters
+    curvature_rad = (left_curverad + right_curverad) / 2
+    return curvature_rad
+
+
+def draw_lanes(orig_img,
+               birdview,
+               inv_M,
+               left_lane,
+               right_lane,
+               w,
+               h,
+               debug_lv=0):
+    # Create an image to draw the lines on
+    warp_zero = np.zeros_like(birdview).astype(np.uint8)
+    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+
+    # Recast the x and y points into usable format for cv2.fillPoly()
+    pts_left = np.array([
+        np.transpose(np.vstack([left_fitx, ploty])),
+    ])
+    pts_right = np.array([
+        np.flipud(np.transpose(np.vstack([right_fitx, ploty]))),
+    ])
+    pts = np.hstack((pts_left, pts_right))
 
     # Draw the lane onto the warped blank image
-    cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
-    cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
-    result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
-    plt.imshow(result)
+    cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
 
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
-    plt.xlim(0, 1280)
-    plt.ylim(720, 0)
+    # Warp the blank back to original image space using inverse perspective matrix (Minv)
+    newwarp = cv2.warpPerspective(color_warp, inv_M, (w, h))
+
+    # Combine the result with the original image
+    result = cv2.addWeighted(orig_img, 1, newwarp, 0.3, 0)
+
+    if debug_lv >= 1:
+        plt.imshow(result)
+        plt.show()
+
+    return result
