@@ -4,8 +4,8 @@ import glob
 from collections import defaultdict
 
 import cv2
-import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
@@ -96,14 +96,14 @@ def detect_lane(rgb_img, state_id=None):
     return img
 
 
-def detect_lane2(rgb_img, state_id=None):
+def lane_pipe(rgb_img, state_id=None):
     '''
     The goals / steps of this project are the following:
         x Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
         x Apply a distortion correction to raw images.
         x Use color transforms, gradients, etc., to create a thresholded binary image.
         x Apply a perspective transform to rectify binary image ("birds-eye view").
-        Detect lane pixels and fit to find the lane boundary.
+        x Detect lane pixels and fit to find the lane boundary.
         Determine the curvature of the lane and vehicle position with respect to center.
         Warp the detected lane boundaries back onto the original image.
         Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
@@ -128,10 +128,7 @@ def detect_lane2(rgb_img, state_id=None):
     img = helper.region_of_interest(img, [region])
     img = helper2.bird_eye_view(img, region.astype('float32'), w, h)
 
-    histogram = np.sum(img[img.shape[0]//2:,:], axis=0)
-    plt.plot(histogram)
-    plt.show()
-
+    helper2.detect_lane(img, debug_lv=2)
 
     return img
 
@@ -141,11 +138,11 @@ def process_image(output_root='./output_images',
                   debug=True):
     test_imgs = os.listdir(img_root)
     if debug:
-        test_imgs = test_imgs[:3]
+        test_imgs = test_imgs  #[:3]
 
     for path in test_imgs:
         img = mpimg.imread(os.path.join(img_root, path))
-        img = detect_lane2(img)
+        img = lane_pipe(img)
 
         cv2.imwrite(
             os.path.join(output_root, path),
