@@ -161,7 +161,7 @@ def process_image(output_root='./output_images',
                   debug=True):
     test_imgs = os.listdir(img_root)
     if debug:
-        test_imgs = test_imgs[:3]
+        test_imgs = test_imgs
 
     for path in test_imgs:
         img = mpimg.imread(os.path.join(img_root, path))
