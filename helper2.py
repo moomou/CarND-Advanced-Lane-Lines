@@ -124,7 +124,7 @@ def _detect_lane_px_from_fit(bin_img,
     out_img = None
     if debug_lv >= 1:
         # Create an image to draw on and an image to show the selection window
-        out_img = np.dstack((bin_img, bin_img, bin_img)) * 255
+        out_img = np.ones_like(bin_img) * 255
         # Color in left and right line pixels
         out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [
             255, 0, 0
@@ -132,6 +132,11 @@ def _detect_lane_px_from_fit(bin_img,
         out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [
             0, 0, 255
         ]
+
+        plt.imshow(out_img)
+        plt.xlim(0, 1280)
+        plt.ylim(720, 0)
+        plt.show()
 
     return (leftx, lefty, rightx, righty, out_img)
 
@@ -292,7 +297,8 @@ def detect_lane(bin_img,
 
     else:
         (left_fit, right_fit, leftx, lefty, rightx,
-         righty) = _detect_lane_from_img(bin_img, margin, minpix)
+         righty) = _detect_lane_from_img(
+             bin_img, margin, minpix, debug_lv=debug_lv)
 
     left_lane.update(left_fit, leftx, lefty)
     right_lane.update(right_fit, rightx, righty)
@@ -311,9 +317,9 @@ def draw_lanes(orig_img,
                debug_lv=0):
 
     left_fit = left_lane.best_fit
-    print('left_fit', left_fit)
+    # print('left_fit', left_fit)
     right_fit = right_lane.best_fit
-    print('right_fit', right_fit)
+    # print('right_fit', right_fit)
 
     leftx, lefty, rightx, righty, out_img = _detect_lane_px_from_fit(
         bin_img,
@@ -338,12 +344,12 @@ def draw_lanes(orig_img,
     ])
     pts = np.hstack((pts_left, pts_right))
 
-    print('HEY??', pts.shape)
+    #print('HEY??', pts.shape)
     # Draw the lane onto the warped blank image
     cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
 
     # unwarp
-    print('HI::', color_warp.shape)
+    #print('HI::', color_warp.shape)
     newwarp = cv2.warpPerspective(color_warp, inv_M, (w, h))
 
     # Combine the result with the original image
@@ -353,5 +359,5 @@ def draw_lanes(orig_img,
         plt.imshow(result)
         plt.show()
 
-    print('Hi::', result)
+    #print('Hi::', result)
     return result

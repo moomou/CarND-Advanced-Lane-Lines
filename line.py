@@ -38,10 +38,16 @@ class Line():
         return fitx, y_eval, ploty
 
     def update(self, best_fit, allx, ally):
-        self.best_fit = (best_fit + (self.best_fit or best_fit)) / 2
+        if self.best_fit is None:
+            prev_fit = best_fit
+        else:
+            prev_fit = self.best_fit
+        self.best_fit = (best_fit + prev_fit) / 2
 
         self.allx = allx
         self.ally = ally
+
+        self.detected = True
 
     def curvature(self, h):
         fitx, y_eval, ploty = self._fit(h)
@@ -56,4 +62,4 @@ class Line():
 
     def base_x(self, h):
         fitx, _, _ = self._fit(h)
-        return fitx
+        return fitx[-1]

@@ -3,6 +3,7 @@ import os
 import glob
 from importlib import reload
 from collections import defaultdict
+from moviepy.editor import VideoFileClip
 
 import cv2
 import matplotlib.image as mpimg
@@ -147,9 +148,10 @@ def lane_pipe(rgb_img, state_id=None):
     center_offset = np.abs(w / 2 -
                            (left_lane.base_x(h) + right_lane.base_x(h)) / 2)
 
-    txt = 'Est. curvature = %s\n Est. center offset = %s\n' % (curavture_rad,
-                                                               center_offset)
-    cv2.putText(img, txt, (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, 255)
+    txt1 = 'Est. curv = %.2fm' % curavture_rad
+    txt2 = 'Est. center offset = %.2fm' % center_offset
+    cv2.putText(img, txt1, (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, 255)
+    cv2.putText(img, txt2, (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 2, 255)
 
     state['left_lane'] = left_lane
     state['right_lane'] = right_lane
@@ -172,10 +174,28 @@ def process_image(output_root='./output_images',
             cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
 
+def process_video(vidpath, start=None, end=None):
+    state_id = os.path.basename(vidpath)
+    output_path = os.path.join('./test_videos_output', state_id)
+
+    def process_image(image):
+        result = lane_pipe(image, state_id)
+        return result
+
+    clip = VideoFileClip(vidpath)
+
+    if start and end:
+        clip = clip.subclip(float(start), float(end))
+
+    out_clip = clip.fl_image(process_image)
+    out_clip.write_videofile(output_path, audio=False)
+
+
 if __name__ == '__main__':
     import fire
 
     fire.Fire({
         'proc': process_image,
         'cam': cam_calibration,
+        'vid': process_video,
     })
