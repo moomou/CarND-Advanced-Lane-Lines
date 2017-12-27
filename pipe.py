@@ -6,9 +6,7 @@ from collections import defaultdict
 
 import cv2
 import matplotlib.image as mpimg
-import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
 
 import helper
 import helper2
@@ -19,8 +17,6 @@ helper = reload(helper)
 util = reload(util)
 
 _state_cache = defaultdict(dict)
-right_lane = None
-left_lane = None
 
 # Checkerboard pattern corners
 NX = 9
@@ -108,11 +104,21 @@ def lane_pipe(rgb_img, state_id=None):
         x Use color transforms, gradients, etc., to create a thresholded binary image.
         x Apply a perspective transform to rectify binary image ("birds-eye view").
         x Detect lane pixels and fit to find the lane boundary.
-        Determine the curvature of the lane and vehicle position with respect to center.
-        Warp the detected lane boundaries back onto the original image.
-        Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
+        x Determine the curvature of the lane and vehicle position with respect to center.
+        x Warp the detected lane boundaries back onto the original image.
+        x Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
     '''
-    global _state_cache, left_lane, right_lane
+    global _state_cache
+
+    if state_id is None:
+        # keep no state
+        state = {}
+        right_lane = Line()
+        left_lane = Line()
+    else:
+        state = _state_cache[state_id]
+        left_lane = state.get('left_lane') or Line()
+        right_lane = state.get('right_lane') or Line()
 
     h, w, chan = rgb_img.shape
     region = np.array([
@@ -135,11 +141,18 @@ def lane_pipe(rgb_img, state_id=None):
     left_lane, right_lane = helper2.detect_lane(
         img, left_lane, right_lane, debug_lv=2)
 
-    img = helper2.draw_lanes(rgb_img, inv_M, img, left_lane, right_lane, w, h)
-    img = helper2.draw_text(
-        'Est. curvature = %s\n Est. center offset = %s\n' % curavture_rad,
-        center_offset)
+    img = helper2.draw_lanes(rgb_img, img, inv_M, left_lane, right_lane, w, h)
 
+    curavture_rad = left_lane.curvature(h) + right_lane.curvature(h)
+    center_offset = np.abs(w / 2 -
+                           (left_lane.base_x(h) + right_lane.base_x(h)) / 2)
+
+    txt = 'Est. curvature = %s\n Est. center offset = %s\n' % (curavture_rad,
+                                                               center_offset)
+    cv2.putText(img, txt, (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, 255)
+
+    state['left_lane'] = left_lane
+    state['right_lane'] = right_lane
     return img
 
 
@@ -148,7 +161,7 @@ def process_image(output_root='./output_images',
                   debug=True):
     test_imgs = os.listdir(img_root)
     if debug:
-        test_imgs = test_imgs  #[:3]
+        test_imgs = test_imgs[:3]
 
     for path in test_imgs:
         img = mpimg.imread(os.path.join(img_root, path))

@@ -2,9 +2,6 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-import helper
-import util
-
 cam_cal = np.load('./cam_cal.npz')
 
 
@@ -22,12 +19,6 @@ def binary_thres(img, lower_pct=97, upper_pct=100, lower=None, upper=None):
     binary[(img >= lower) & (img <= upper)] = 1
 
     return binary
-
-
-def _scale_img(img):
-    abs_img = np.absolute(img)
-    scaled = np.uint8(255 * abs_img / np.max(abs_img))
-    return scaled
 
 
 def sobel_thres(img, sobel_kernel=3):
@@ -303,32 +294,10 @@ def detect_lane(bin_img,
         (left_fit, right_fit, leftx, lefty, rightx,
          righty) = _detect_lane_from_img(bin_img, margin, minpix)
 
-    # TODO: save the result onto lane classes
+    left_lane.update(left_fit, leftx, lefty)
+    right_lane.update(right_fit, rightx, righty)
 
     return left_lane, right_lane
-
-
-def cal_curvature_and_center_pos(ploty, leftx, rightx):
-    # Define conversions in x and y from pixels space to meters
-    ym_per_pix = 30 / 720  # meters per pixel in y dimension
-    xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
-
-    y_eval = np.max(ploty)
-
-    # Fit new polynomials to x,y in world space
-    left_fit_cr = np.polyfit(ploty * ym_per_pix, leftx * xm_per_pix, 2)
-    right_fit_cr = np.polyfit(ploty * ym_per_pix, rightx * xm_per_pix, 2)
-    # Calculate the new radii of curvature
-    left_curverad = ((
-        1 + (2 * left_fit_cr[0] * y_eval * ym_per_pix + left_fit_cr[1])**2)**
-                     1.5) / np.absolute(2 * left_fit_cr[0])
-    right_curverad = ((
-        1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1])**2)**
-                      1.5) / np.absolute(2 * right_fit_cr[0])
-
-    # Now our radius of curvature is in meters
-    curvature_rad = (left_curverad + right_curverad) / 3
-    return curvature_rad
 
 
 def draw_lanes(orig_img,
@@ -342,9 +311,11 @@ def draw_lanes(orig_img,
                debug_lv=0):
 
     left_fit = left_lane.best_fit
+    print('left_fit', left_fit)
     right_fit = right_lane.best_fit
+    print('right_fit', right_fit)
 
-    (leftx, lefty, rightx, righty) = _detect_lane_px_from_fit(
+    leftx, lefty, rightx, righty, out_img = _detect_lane_px_from_fit(
         bin_img,
         left_lane.best_fit,
         right_lane.best_fit,
@@ -356,8 +327,7 @@ def draw_lanes(orig_img,
     right_fitx = right_fit[0] * ploty**2 + right_fit[1] * ploty + right_fit[2]
 
     # Create an image to draw the lines on
-    warp_zero = np.zeros_like(bin_img).astype(np.uint8)
-    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+    color_warp = np.zeros_like(bin_img).astype(np.uint8)
 
     # Recast the x and y points into usable format for cv2.fillPoly()
     pts_left = np.array([
@@ -368,10 +338,12 @@ def draw_lanes(orig_img,
     ])
     pts = np.hstack((pts_left, pts_right))
 
+    print('HEY??', pts.shape)
     # Draw the lane onto the warped blank image
     cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
 
     # unwarp
+    print('HI::', color_warp.shape)
     newwarp = cv2.warpPerspective(color_warp, inv_M, (w, h))
 
     # Combine the result with the original image
@@ -381,4 +353,5 @@ def draw_lanes(orig_img,
         plt.imshow(result)
         plt.show()
 
+    print('Hi::', result)
     return result
