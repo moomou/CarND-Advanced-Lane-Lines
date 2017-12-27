@@ -134,8 +134,6 @@ def lane_pipe(rgb_img, state_id=None):
 
     left_lane, right_lane = helper2.detect_lane(
         img, left_lane, right_lane, debug_lv=2)
-    curavture_rad, center_offset = helper2.cal_curvature_and_center_pos(
-        left_lane, right_lane)
 
     img = helper2.draw_lanes(rgb_img, inv_M, img, left_lane, right_lane, w, h)
     img = helper2.draw_text(
