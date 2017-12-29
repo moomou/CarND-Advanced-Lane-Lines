@@ -56,10 +56,10 @@ For examples of distortion, see sections below.
 #### 1. Provide an example of a distortion-corrected image.
 
 To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
-![Example](asset/example.jpg)
+![Example](asset/sample.png)
 
 Here is the undistored image using `cv2.undistort`
-![Undistorted](asset/undistort.jpg)
+![Undistorted](asset/undist.png)
 
 As can be clearly seen, the edges of the chessboard is now straight; this validates the undistortion step is completed correctly.
 
