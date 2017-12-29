@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
+import util
+
 cam_cal = np.load('./cam_cal.npz')
 
 
@@ -51,13 +53,25 @@ def sobel_thres(img, sobel_kernel=3):
     return np.dstack([combined_bin] * 3)
 
 
-def edge_detection(rgb_img, s_only=False):
+def edge_detection(rgb_img, s_only=False, clahe=True):
+    if clahe:
+        clahe = cv2.createCLAHE(clipLimit=3., tileGridSize=(8, 8))
+    else:
+        clahe = None
+
     R = rgb_img[:, :, 0]
+    if clahe:
+        R = clahe.apply(R)
+
     r_binary = binary_thres(R)
     r_edge = sobel_thres(r_binary)  # helper.canny(img)
 
     hls = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HLS)
     S = hls[:, :, 2]
+
+    if clahe:
+        S = clahe.apply(S)
+
     s_binary = binary_thres(S)
     s_edge = sobel_thres(s_binary)
 
@@ -141,7 +155,7 @@ def _detect_lane_px_from_fit(bin_img,
     return (leftx, lefty, rightx, righty, out_img)
 
 
-def _detect_lane_from_fit(bin_img, left_fit, right_fit, margin=200,
+def _detect_lane_from_fit(bin_img, left_fit, right_fit, margin=100,
                           debug_lv=0):
     leftx, lefty, rightx, righty, out_img = _detect_lane_px_from_fit(
         bin_img, left_fit, right_fit, debug_lv=debug_lv)
@@ -176,6 +190,7 @@ def _detect_lane_from_fit(bin_img, left_fit, right_fit, margin=200,
         cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
         result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
         plt.imshow(result)
+        plt.title('from fit')
 
         plt.plot(left_fitx, ploty, color='yellow')
         plt.plot(right_fitx, ploty, color='yellow')
@@ -183,6 +198,32 @@ def _detect_lane_from_fit(bin_img, left_fit, right_fit, margin=200,
         plt.ylim(720, 0)
 
     return (left_fit, right_fit, leftx, lefty, rightx, righty)
+
+
+def _clean_lane_segment(win_img, min_px=800, connectivity=4, debug_lv=0):
+    # Perform the operation
+    labels, stats = cv2.connectedComponentsWithStats(win_img, connectivity,
+                                                     cv2.CV_32S)[1:3]
+    # selected_height = util.reject_outliers(stats[1:, cv2.CC_STAT_HEIGHT])
+    areas = stats[1:, cv2.CC_STAT_AREA]
+    area_selector = util.reject_outliers(areas, min_val=min_px)
+    selected_area = stats[1:, cv2.CC_STAT_AREA][area_selector]
+
+    if len(selected_area) == len(stats[1:, cv2.CC_STAT_AREA]):
+        return win_img.nonzero()[:2]
+
+    if debug_lv >= 2:
+        plt.figure()
+        plt.imshow(labels)
+        plt.show()
+
+    selected_labels = 1 + area_selector[0]
+
+    for selected in selected_labels:
+        labels[labels == selected] = 255
+
+    labels[labels != 255] = 0
+    return labels.nonzero()[:2]
 
 
 def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
@@ -200,7 +241,7 @@ def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
     left_base = np.argmax(histogram[:midpoint])
     right_base = np.argmax(histogram[midpoint:]) + midpoint
 
-    nwin = 9
+    nwin = 15
     win_height = np.int(bin_img.shape[0] / nwin)
 
     # Identify the x and y positions of all nonzero pixels in the image
@@ -209,7 +250,9 @@ def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
     nonzeroy, nonzerox, _ = nonzero
 
     left_current = left_base
+    left_last = left_base
     right_current = right_base
+    right_last = right_base
 
     # Create empty lists to receive left and right lane pixel indices
     left_lane_inds = []
@@ -220,6 +263,7 @@ def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
         # Identify window boundaries in x and y (and right and left)
         win_y_low = bin_img.shape[0] - (window + 1) * win_height
         win_y_high = bin_img.shape[0] - window * win_height
+
         win_xleft_low = left_current - margin
         win_xleft_high = left_current + margin
         win_xright_low = right_current - margin
@@ -231,7 +275,7 @@ def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
         cv2.rectangle(out_img, (win_xright_low, win_y_low),
                       (win_xright_high, win_y_high), (0, 255, 0), 2)
 
-        # Identify the nonzero pixels in x and y within the window
+        # identify the nonzero pixels in x and y within the window
         good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) &
                           (nonzerox >= win_xleft_low) &
                           (nonzerox < win_xleft_high)).nonzero()[0]
@@ -242,11 +286,51 @@ def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
         left_lane_inds.append(good_left_inds)
         right_lane_inds.append(good_right_inds)
 
+        # print(rect_area)
+        # print(nonzerox.shape)
+        # print(good_left_inds.shape)
+        # print(len(good_left_inds), len(good_right_inds))
+        # print('==')
         # If you found > minpix pixels, recenter next window on their mean position
         if len(good_left_inds) > minpix:
+            selected = util.reject_outliers(nonzerox[good_left_inds])
+            left_last = left_current
             left_current = np.int(np.mean(nonzerox[good_left_inds]))
+        else:
+            # take the difference between last and current estimate and continue
+            # to move in the same direction
+            leftx_diff = left_current - left_last
+            if leftx_diff > 0:
+                # means we moved right, continue to move right
+                left_last = left_current
+                left_current -= leftx_diff // 2
+            else:
+                left_last = left_current
+                left_current += leftx_diff // 2
+
         if len(good_right_inds) > minpix:
-            right_current = np.int(np.mean(nonzerox[good_right_inds]))
+            selected = util.reject_outliers2(nonzerox[good_right_inds])
+
+            if debug_lv >= 3:
+                out_img[nonzeroy[good_right_inds[selected]], nonzerox[
+                    good_right_inds[selected]]] = [255, 0, 0]
+                plt.imshow(out_img)
+                plt.show()
+
+            right_last = right_current
+            right_current = np.int(
+                np.mean(nonzerox[good_right_inds[selected]]))
+        else:
+            # take the difference between last and current estimate and continue
+            # to move in the same direction
+            rightx_diff = right_current - right_last
+            if rightx_diff > 0:
+                # means we moved right, continue to move right
+                right_last = right_current
+                right_current -= rightx_diff // 2
+            else:
+                right_last = right_current
+                right_current += rightx_diff // 2
 
     # Concatenate the arrays of indices
     left_lane_inds = np.concatenate(left_lane_inds)
@@ -255,19 +339,38 @@ def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
     # Extract left and right line pixel positions
     leftx = nonzerox[left_lane_inds]
     lefty = nonzeroy[left_lane_inds]
+    left_lane_area = np.copy(bin_img[:, :, 0])
+    left_lane_area[lefty, leftx] = 255
+    left_lane_area[left_lane_area != 255] = 0
+    ly, lx = _clean_lane_segment(left_lane_area, debug_lv=debug_lv)
+
     rightx = nonzerox[right_lane_inds]
     righty = nonzeroy[right_lane_inds]
+    right_lane_area = np.copy(bin_img[:, :, 0])
+    right_lane_area[righty, rightx] = 255
+    right_lane_area[right_lane_area != 255] = 0
+    ry, rx = _clean_lane_segment(right_lane_area, debug_lv=debug_lv)
+
+    if debug_lv >= 2:
+        viz = np.copy(out_img[:, :, 0])
+        viz[:, :] = 0
+        viz[ry, rx] = 255
+        plt.figure()
+        plt.title("HEY")
+        plt.imshow(viz)
+        plt.show()
+
     # Fit a second order polynomial to each
-    left_fit = np.polyfit(lefty, leftx, 2)
-    right_fit = np.polyfit(righty, rightx, 2)
+    left_fit = np.polyfit(ly, lx, 2)
+    right_fit = np.polyfit(ry, rx, 2)
 
     # Generate x and y values for plotting
     ploty = np.linspace(0, bin_img.shape[0] - 1, bin_img.shape[0])
     left_fitx = left_fit[0] * ploty**2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty**2 + right_fit[1] * ploty + right_fit[2]
 
-    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+    out_img[ly, lx] = [255, 0, 0]
+    out_img[ry, rx] = [0, 0, 255]
 
     if debug_lv >= 2:
         plt.imshow(out_img)
@@ -283,7 +386,7 @@ def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
 def detect_lane(bin_img,
                 left_lane,
                 right_lane,
-                margin=200,
+                margin=100,
                 minpix=90,
                 debug_lv=0):
 
@@ -293,15 +396,22 @@ def detect_lane(bin_img,
 
         (left_fit, right_fit, leftx, lefty, rightx,
          righty) = _detect_lane_from_fit(
-             bin_img, left_fit, right_fit, debug_lv=debug_lv)
+             bin_img,
+             left_fit,
+             right_fit,
+             margin=margin / 2,
+             debug_lv=debug_lv)
 
-    else:
+        left_lane.update(left_fit, leftx, lefty)
+        right_lane.update(right_fit, rightx, righty)
+
+    if not left_lane.detected or not right_lane.detected:
         (left_fit, right_fit, leftx, lefty, rightx,
          righty) = _detect_lane_from_img(
              bin_img, margin, minpix, debug_lv=debug_lv)
 
-    left_lane.update(left_fit, leftx, lefty)
-    right_lane.update(right_fit, rightx, righty)
+        left_lane.update(left_fit, leftx, lefty)
+        right_lane.update(right_fit, rightx, righty)
 
     return left_lane, right_lane
 

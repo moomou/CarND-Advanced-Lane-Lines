@@ -4,26 +4,24 @@ eps = np.finfo(np.float32).eps
 
 
 def reject_outliers_noop(data):
-    return [True] * len(data)
+    selected = np.where(np.ones_like(data) == 1)
+    return selected
 
 
 def reject_outliers2(data, m=2):
-    selector = np.array(abs(data - np.mean(data)) <= m * np.std(data))
-
-    if len(selector.shape) == 0:
-        selector = selector.reshape((1, ))
-
+    selector = np.where(abs(data - np.mean(data)) <= m * np.std(data))
     return selector
 
 
-def reject_outliers(data, m=2.):
-    d = np.abs(data - np.median(data))
+def reject_outliers(data, m=1.5, min_val=None):
+    median = np.median(data)
+    if min_val is not None:
+        median = np.median(data[data > min_val])
+
+    d = np.abs(data - median)
     mdev = np.median(d)
     s = d / mdev if mdev else 0.
-    selector = np.array(s <= m)
-
-    if len(selector.shape) == 0:
-        selector = selector.reshape((1, ))
+    selector = np.where(s <= m)
 
     return selector
 

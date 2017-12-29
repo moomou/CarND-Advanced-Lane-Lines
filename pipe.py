@@ -97,7 +97,7 @@ def detect_lane(rgb_img, state_id=None):
     return img
 
 
-def lane_pipe(rgb_img, state_id=None):
+def lane_pipe(rgb_img, state_id=None, debug_lv=0):
     '''
     The goals / steps of this project are the following:
         x Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
@@ -140,7 +140,7 @@ def lane_pipe(rgb_img, state_id=None):
     img, M, inv_M = helper2.bird_eye_view(img, region.astype('float32'), w, h)
 
     left_lane, right_lane = helper2.detect_lane(
-        img, left_lane, right_lane, debug_lv=2)
+        img, left_lane, right_lane, debug_lv=debug_lv)
 
     img = helper2.draw_lanes(rgb_img, img, inv_M, left_lane, right_lane, w, h)
 
@@ -174,12 +174,12 @@ def process_image(output_root='./output_images',
             cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
 
-def process_video(vidpath, start=None, end=None):
+def process_video(vidpath, start=None, end=None, debug_lv=0):
     state_id = os.path.basename(vidpath)
     output_path = os.path.join('./test_videos_output', state_id)
 
     def process_image(image):
-        result = lane_pipe(image, state_id)
+        result = lane_pipe(image, state_id, debug_lv)
         return result
 
     clip = VideoFileClip(vidpath)
