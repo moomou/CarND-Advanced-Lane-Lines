@@ -7,6 +7,17 @@ import util
 cam_cal = np.load('./cam_cal.npz')
 
 
+def _detect_yellow():
+    # Detect color yellow
+    offset = 180
+    yellow_selector = (rgb_img[:, :, 0] >
+                       offset) & (rgb_img[:, :, 1] > offset) & (
+                           np.abs(rgb_img[:, :, 0] - rgb_img[:, :, 1]) < 80)
+    yellow = np.copy(rgb_img)
+    yellow[:, :, :] = 0
+    yellow[yellow_selector] = [255, 255, 255]
+
+
 def binary_thres(img, lower_pct=97, upper_pct=100, lower=None, upper=None):
     assert len(img.shape) == 2 or img.shape[0] == 1
 
@@ -206,7 +217,7 @@ def _clean_lane_segment(win_img, min_px=800, connectivity=4, debug_lv=0):
                                                      cv2.CV_32S)[1:3]
     # selected_height = util.reject_outliers(stats[1:, cv2.CC_STAT_HEIGHT])
     areas = stats[1:, cv2.CC_STAT_AREA]
-    area_selector = util.reject_outliers(areas, min_val=min_px)
+    area_selector = util.reject_outliers2(areas, min_val=min_px)
     selected_area = stats[1:, cv2.CC_STAT_AREA][area_selector]
 
     if len(selected_area) == len(stats[1:, cv2.CC_STAT_AREA]):

@@ -12,7 +12,7 @@ import numpy as np
 import helper
 import helper2
 import util
-from line import Line
+from line import Line, xm_per_pix
 
 helper = reload(helper)
 util = reload(util)
@@ -62,41 +62,6 @@ def cam_calibration(viz=False):
     return mtx, dist
 
 
-def detect_lane(rgb_img, state_id=None):
-    '''Detects and draw lane overlay; returns img as np array'''
-    global _state_cache
-
-    h, w, chan = rgb_img.shape
-
-    img = helper.grayscale(rgb_img)
-    img = helper.gaussian_blur(img, 5)
-
-    # mask other regions
-    region = np.array([
-        # middle center
-        (int(w / 2), int(h / 2)),
-        # bottom left
-        (int(w * 0.1), int(h * 0.90)),
-        # bottom right
-        (int(w * 0.9), int(h * 0.90)),
-    ])
-    img = helper.canny(img, 30, 150)
-    img = helper.region_of_interest(img, [region])
-
-    state = _state_cache[state_id] if state_id else None
-    img = helper.hough_lines(
-        img,
-        rho=2,
-        theta=np.pi / 180,
-        threshold=64,
-        min_line_len=50,
-        max_line_gap=40,
-        state=state)
-    img = helper.weighted_img(img, rgb_img)
-
-    return img
-
-
 def lane_pipe(rgb_img, state_id=None, debug_lv=0):
     '''
     The goals / steps of this project are the following:
@@ -136,38 +101,46 @@ def lane_pipe(rgb_img, state_id=None, debug_lv=0):
     img = helper2.undistort_img(rgb_img)
     img = helper.gaussian_blur(img, 5)
     img = helper2.edge_detection(img)
+
+    # cv2.imwrite('edge_detection.png', img)
+
     img = helper.region_of_interest(img, [region])
+
+    # cv2.imwrite('region.png', img)
     img, M, inv_M = helper2.bird_eye_view(img, region.astype('float32'), w, h)
 
     left_lane, right_lane = helper2.detect_lane(
         img, left_lane, right_lane, debug_lv=debug_lv)
 
     img = helper2.draw_lanes(rgb_img, img, inv_M, left_lane, right_lane, w, h)
+    cv2.imwrite('unwarped.png', img)
 
     curavture_rad = left_lane.curvature(h) + right_lane.curvature(h)
     center_offset = np.abs(w / 2 -
                            (left_lane.base_x(h) + right_lane.base_x(h)) / 2)
 
     txt1 = 'Est. curv = %.2fm' % curavture_rad
-    txt2 = 'Est. center offset = %.2fm' % center_offset
+    txt2 = 'Est. center offset = %.2fm' % (center_offset * xm_per_pix)
     cv2.putText(img, txt1, (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, 255)
     cv2.putText(img, txt2, (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 2, 255)
 
     state['left_lane'] = left_lane
     state['right_lane'] = right_lane
+
     return img
 
 
 def process_image(output_root='./output_images',
                   img_root='test_images',
-                  debug=True):
+                  debug_lv=0):
     test_imgs = os.listdir(img_root)
-    if debug:
-        test_imgs = test_imgs
 
     for path in test_imgs:
+        if not path.endswith('5.jpg'):
+            continue
+
         img = mpimg.imread(os.path.join(img_root, path))
-        img = lane_pipe(img)
+        img = lane_pipe(img, debug_lv=debug_lv)
 
         cv2.imwrite(
             os.path.join(output_root, path),

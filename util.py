@@ -8,8 +8,13 @@ def reject_outliers_noop(data):
     return selected
 
 
-def reject_outliers2(data, m=2):
-    selector = np.where(abs(data - np.mean(data)) <= m * np.std(data))
+def reject_outliers2(data, m=2, min_val=None):
+    mean = np.mean(data)
+
+    if min_val is not None:
+        mean = np.mean(data[data > min_val])
+
+    selector = np.where(abs(data - mean) <= m * np.std(data))
     return selector
 
 
