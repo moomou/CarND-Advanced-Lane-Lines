@@ -98,12 +98,11 @@ def lane_pipe(rgb_img, state_id=None, debug_lv=0):
         (int(w * 0.2), int(h * 0.85)),
     ])
 
-    img = helper2.undistort_img(rgb_img)
+    undistorted = img = helper2.undistort_img(rgb_img)
     img = helper.gaussian_blur(img, 5)
     img = helper2.edge_detection(img)
 
     # cv2.imwrite('edge_detection.png', img)
-
     img = helper.region_of_interest(img, [region])
 
     # cv2.imwrite('region.png', img)
@@ -112,8 +111,9 @@ def lane_pipe(rgb_img, state_id=None, debug_lv=0):
     left_lane, right_lane = helper2.detect_lane(
         img, left_lane, right_lane, debug_lv=debug_lv)
 
-    img = helper2.draw_lanes(rgb_img, img, inv_M, left_lane, right_lane, w, h)
-    cv2.imwrite('unwarped.png', img)
+    img = helper2.draw_lanes(undistorted, img, inv_M, left_lane, right_lane, w,
+                             h)
+    # cv2.imwrite('unwarped.png', img)
 
     curavture_rad = left_lane.curvature(h) + right_lane.curvature(h)
     center_offset = np.abs(w / 2 -
@@ -136,9 +136,6 @@ def process_image(output_root='./output_images',
     test_imgs = os.listdir(img_root)
 
     for path in test_imgs:
-        if not path.endswith('5.jpg'):
-            continue
-
         img = mpimg.imread(os.path.join(img_root, path))
         img = lane_pipe(img, debug_lv=debug_lv)
 

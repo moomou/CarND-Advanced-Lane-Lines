@@ -101,6 +101,26 @@ def undistort_img(img):
     return cv2.undistort(img, mtx, dist, None, None)
 
 
+def distort_img(img):
+    mtx = cam_cal['mtx']
+    dist = cam_cal['dist']
+
+    # http://answers.opencv.org/question/98929/trying-to-re-distort-image-points-using-projectpoints/
+    x, y = img[:, 0], img[:, 1]
+    print(x.shape)
+    print(y.shape)
+    x = (x - mtx[0, 2]) / mtx[0, 0]
+    y = (x - mtx[1, 2]) / mtx[1, 1]
+    new_img = np.dstack([x, y, 1])
+
+    print(new_img.shape)
+    new_img = cv2.projectPoints(new_img,
+                                np.zeros((3, 1, cv2.CV_64F)),
+                                np.zeros((3, 1, cv2.CV_64F)), mtx, dis)
+
+    return new_img
+
+
 def bird_eye_view(img, src_corners, w, h, offset=10):
     dst_corners = np.array([(offset, offset), (w - offset, offset),
                             (w - offset, h - offset),
@@ -465,20 +485,17 @@ def draw_lanes(orig_img,
     ])
     pts = np.hstack((pts_left, pts_right))
 
-    #print('HEY??', pts.shape)
     # Draw the lane onto the warped blank image
     cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
 
     # unwarp
-    #print('HI::', color_warp.shape)
-    newwarp = cv2.warpPerspective(color_warp, inv_M, (w, h))
+    unwarp = cv2.warpPerspective(color_warp, inv_M, (w, h))
 
     # Combine the result with the original image
-    result = cv2.addWeighted(orig_img, 1, newwarp, 0.3, 0)
+    result = cv2.addWeighted(orig_img, 1, unwarp, 0.3, 0)
 
     if debug_lv >= 1:
         plt.imshow(result)
         plt.show()
 
-    #print('Hi::', result)
     return result

@@ -76,9 +76,8 @@ class Line():
 
         line_base_pos = self.line_base_pos
         line_base_pos.append(fitx[-1])
-        selected = util.reject_outliers(np.array(line_base_pos), m=1.2)
 
-        self.line_base_pos = np.array(line_base_pos)[selected].tolist()
+        self.line_base_pos = np.array(line_base_pos).tolist()
         self.line_base_pos = self.line_base_pos[-5:]
 
         return np.mean(self.line_base_pos)
