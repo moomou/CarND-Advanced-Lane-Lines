@@ -18,7 +18,18 @@ def _detect_yellow():
     yellow[yellow_selector] = [255, 255, 255]
 
 
-def binary_thres(img, lower_pct=97, upper_pct=100, lower=None, upper=None):
+def _save_bin_img(to_copy, name):
+    tosave = np.copy(to_copy)
+    tosave[tosave >= 1] = 255
+    cv2.imwrite(name, tosave)
+
+
+def binary_thres(img,
+                 lower_pct=97,
+                 upper_pct=100,
+                 lower=None,
+                 upper=None,
+                 invert=False):
     assert len(img.shape) == 2 or img.shape[0] == 1
 
     if lower is None:
@@ -26,22 +37,33 @@ def binary_thres(img, lower_pct=97, upper_pct=100, lower=None, upper=None):
     if upper is None:
         upper = np.percentile(img, upper_pct)
 
-    # print(lower, upper)
+    # print('L', lower, 'U', upper)
 
     binary = np.zeros_like(img)
     binary[(img >= lower) & (img <= upper)] = 1
 
+    if invert:
+        ones = binary == 1
+        zeros = binary < 1
+        binary[zeros] = 1
+        binary[ones] = 0
+
     return binary
 
 
-def sobel_thres(img, sobel_kernel=3):
+def sobel_thres(img, sobel_kernel=5, debug_lv=0):
     assert len(img.shape) == 2 or img.shape[-1] == 1
 
     # Take both Sobel x and y gradients
     sobelx = cv2.Sobel(img, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
-    gradx = binary_thres(sobelx, lower=0, upper=255)
+    _save_bin_img(sobelx, 'sobelx.png')
+    gradx = binary_thres(sobelx, lower=0, upper=255, invert=True)
+    _save_bin_img(gradx, 'gradx.png')
+
     sobely = cv2.Sobel(img, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
-    grady = binary_thres(sobely, lower=0, upper=255)
+    _save_bin_img(sobely, 'sobely.png')
+    grady = binary_thres(sobely, lower=0, upper=255, invert=True)
+    _save_bin_img(grady, 'grady.png')
 
     gradmag = np.sqrt(sobelx**2 + sobely**2)
     scale_factor = np.max(gradmag) / 255
@@ -49,22 +71,25 @@ def sobel_thres(img, sobel_kernel=3):
     mag_bin = binary_thres(gradmag, lower=190, upper=255)
 
     absgraddir = np.arctan2(np.absolute(sobely), np.absolute(sobelx))
-    dir_margin = np.pi / 10
-    lower_dir = np.pi / 2 - dir_margin
-    upper_dir = np.pi / 2 + dir_margin
+    dir_margin = np.pi / 5
+    lower_dir = (np.pi / 2) - dir_margin
+    upper_dir = (np.pi / 2) + dir_margin
     condition = (absgraddir >= lower_dir) & (absgraddir < upper_dir)
 
     dir_bin = np.zeros_like(img)
     dir_bin[condition] = 1
+    _save_bin_img(dir_bin, 'dir_bin.png')
 
     combined_bin = np.zeros_like(img)
-    condition = (mag_bin == 1) | (dir_bin == 1) | (img == 1)
+    condition = ((mag_bin >= 1) & (dir_bin >= 1)) | ((gradx >= 1) &
+                                                     (grady >= 1))
     combined_bin[condition] = 255
 
     return np.dstack([combined_bin] * 3)
 
 
-def edge_detection(rgb_img, s_only=False, clahe=True):
+def edge_detection(rgb_img, s_only=False, clahe=True, r_only=False,
+                   debug_lv=0):
     if clahe:
         clahe = cv2.createCLAHE(clipLimit=3., tileGridSize=(8, 8))
     else:
@@ -74,8 +99,12 @@ def edge_detection(rgb_img, s_only=False, clahe=True):
     if clahe:
         R = clahe.apply(R)
 
-    r_binary = binary_thres(R)
-    r_edge = sobel_thres(r_binary)  # helper.canny(img)
+    r_binary = binary_thres(R, lower_pct=99)
+    r_edge = sobel_thres(r_binary, debug_lv=debug_lv)
+
+    if debug_lv >= 1:
+        _save_bin_img(r_binary, 'r_binary.png')
+        cv2.imwrite('r_binary_sobel.png', r_edge)
 
     hls = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HLS)
     S = hls[:, :, 2]
@@ -83,13 +112,19 @@ def edge_detection(rgb_img, s_only=False, clahe=True):
     if clahe:
         S = clahe.apply(S)
 
-    s_binary = binary_thres(S)
-    s_edge = sobel_thres(s_binary)
+    s_binary = binary_thres(S, lower_pct=99)
+    s_edge = sobel_thres(s_binary, debug_lv=debug_lv)
+
+    if debug_lv >= 1:
+        _save_bin_img(s_binary, 's_binary.png')
+        cv2.imwrite('s_binary_sobel.png', s_edge)
 
     final = s_edge
 
     if not s_only:
-        final = final // 2 + r_edge // 2
+        final += r_edge
+
+    final = np.clip(final, 0, 255)
 
     return final
 
@@ -257,13 +292,14 @@ def _clean_lane_segment(win_img, min_px=800, connectivity=4, debug_lv=0):
     return labels.nonzero()[:2]
 
 
-def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
+def _detect_lane_from_img(bin_img, margin=200, minpix=50, debug_lv=0):
     out_img = np.copy(bin_img)
 
     histogram = np.sum(bin_img[bin_img.shape[0] // 2:, :, 0], axis=0)
 
     if debug_lv >= 1:
         plt.figure()
+        plt.title('histogram')
         plt.plot(histogram)
         plt.imshow(out_img)
         plt.show()
@@ -327,6 +363,13 @@ def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
             selected = util.reject_outliers(nonzerox[good_left_inds])
             left_last = left_current
             left_current = np.int(np.mean(nonzerox[good_left_inds]))
+
+            if debug_lv >= 3:
+                out_img[nonzeroy[good_left_inds[selected]], nonzerox[
+                    good_left_inds[selected]]] = [255, 0, 0]
+                plt.imshow(out_img)
+                plt.title('left indices')
+                plt.show()
         else:
             # take the difference between last and current estimate and continue
             # to move in the same direction
@@ -344,8 +387,9 @@ def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
 
             if debug_lv >= 3:
                 out_img[nonzeroy[good_right_inds[selected]], nonzerox[
-                    good_right_inds[selected]]] = [255, 0, 0]
+                    good_right_inds[selected]]] = [0, 0, 255]
                 plt.imshow(out_img)
+                plt.title('right indices')
                 plt.show()
 
             right_last = right_current
@@ -368,26 +412,18 @@ def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
     right_lane_inds = np.concatenate(right_lane_inds)
 
     # Extract left and right line pixel positions
-    leftx = nonzerox[left_lane_inds]
-    lefty = nonzeroy[left_lane_inds]
-    left_lane_area = np.copy(bin_img[:, :, 0])
-    left_lane_area[lefty, leftx] = 255
-    left_lane_area[left_lane_area != 255] = 0
-    ly, lx = _clean_lane_segment(left_lane_area, debug_lv=debug_lv)
-
-    rightx = nonzerox[right_lane_inds]
-    righty = nonzeroy[right_lane_inds]
-    right_lane_area = np.copy(bin_img[:, :, 0])
-    right_lane_area[righty, rightx] = 255
-    right_lane_area[right_lane_area != 255] = 0
-    ry, rx = _clean_lane_segment(right_lane_area, debug_lv=debug_lv)
+    lx = nonzerox[left_lane_inds]
+    ly = nonzeroy[left_lane_inds]
+    rx = nonzerox[right_lane_inds]
+    ry = nonzeroy[right_lane_inds]
 
     if debug_lv >= 2:
         viz = np.copy(out_img[:, :, 0])
         viz[:, :] = 0
         viz[ry, rx] = 255
+        viz[ly, lx] = 255
         plt.figure()
-        plt.title("HEY")
+        plt.title('HEY')
         plt.imshow(viz)
         plt.show()
 
@@ -411,7 +447,7 @@ def _detect_lane_from_img(bin_img, margin=200, minpix=90, debug_lv=0):
         plt.ylim(720, 0)
         plt.show()
 
-    return (left_fit, right_fit, leftx, lefty, rightx, righty)
+    return (left_fit, right_fit, lx, ly, rx, ry)
 
 
 def detect_lane(bin_img,

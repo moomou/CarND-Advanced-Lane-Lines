@@ -93,19 +93,20 @@ def lane_pipe(rgb_img, state_id=None, debug_lv=0):
         # top right
         (int(w / 2) + 100, int(h / 2) + 100),
         # bottom right
-        (int(w * 0.8), int(h * 0.85)),
+        (int(w * 0.9), int(h * 0.95)),
         # bottom left
-        (int(w * 0.2), int(h * 0.85)),
+        (int(w * 0.1), int(h * 0.95)),
     ])
 
     undistorted = img = helper2.undistort_img(rgb_img)
-    img = helper.gaussian_blur(img, 5)
-    img = helper2.edge_detection(img)
+    # img = helper.gaussian_blur(img, 5)
+    img = helper2.edge_detection(img, debug_lv=debug_lv)
 
-    # cv2.imwrite('edge_detection.png', img)
+    cv2.imwrite('edge_detection.png', img)
     img = helper.region_of_interest(img, [region])
 
-    # cv2.imwrite('region.png', img)
+    cv2.imwrite('region.png', img)
+
     img, M, inv_M = helper2.bird_eye_view(img, region.astype('float32'), w, h)
 
     left_lane, right_lane = helper2.detect_lane(
