@@ -56,14 +56,14 @@ def sobel_thres(img, sobel_kernel=5, debug_lv=0):
 
     # Take both Sobel x and y gradients
     sobelx = cv2.Sobel(img, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
-    _save_bin_img(sobelx, 'sobelx.png')
+    # _save_bin_img(sobelx, 'sobelx.png')
     gradx = binary_thres(sobelx, lower=0, upper=255, invert=True)
-    _save_bin_img(gradx, 'gradx.png')
+    # _save_bin_img(gradx, 'gradx.png')
 
     sobely = cv2.Sobel(img, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
-    _save_bin_img(sobely, 'sobely.png')
+    # _save_bin_img(sobely, 'sobely.png')
     grady = binary_thres(sobely, lower=0, upper=255, invert=True)
-    _save_bin_img(grady, 'grady.png')
+    # _save_bin_img(grady, 'grady.png')
 
     gradmag = np.sqrt(sobelx**2 + sobely**2)
     scale_factor = np.max(gradmag) / 255
@@ -78,7 +78,7 @@ def sobel_thres(img, sobel_kernel=5, debug_lv=0):
 
     dir_bin = np.zeros_like(img)
     dir_bin[condition] = 1
-    _save_bin_img(dir_bin, 'dir_bin.png')
+    # _save_bin_img(dir_bin, 'dir_bin.png')
 
     combined_bin = np.zeros_like(img)
     condition = ((mag_bin >= 1) & (dir_bin >= 1)) | ((gradx >= 1) &
@@ -264,32 +264,6 @@ def _detect_lane_from_fit(bin_img, left_fit, right_fit, margin=100,
         plt.ylim(720, 0)
 
     return (left_fit, right_fit, leftx, lefty, rightx, righty)
-
-
-def _clean_lane_segment(win_img, min_px=800, connectivity=4, debug_lv=0):
-    # Perform the operation
-    labels, stats = cv2.connectedComponentsWithStats(win_img, connectivity,
-                                                     cv2.CV_32S)[1:3]
-    # selected_height = util.reject_outliers(stats[1:, cv2.CC_STAT_HEIGHT])
-    areas = stats[1:, cv2.CC_STAT_AREA]
-    area_selector = util.reject_outliers2(areas, min_val=min_px)
-    selected_area = stats[1:, cv2.CC_STAT_AREA][area_selector]
-
-    if len(selected_area) == len(stats[1:, cv2.CC_STAT_AREA]):
-        return win_img.nonzero()[:2]
-
-    if debug_lv >= 2:
-        plt.figure()
-        plt.imshow(labels)
-        plt.show()
-
-    selected_labels = 1 + area_selector[0]
-
-    for selected in selected_labels:
-        labels[labels == selected] = 255
-
-    labels[labels != 255] = 0
-    return labels.nonzero()[:2]
 
 
 def _detect_lane_from_img(bin_img, margin=200, minpix=50, debug_lv=0):

@@ -4,7 +4,7 @@ import util
 
 # Define conversions in x and y from pixels space to meters
 ym_per_pix = 15 / 720  # meters per pixel in y dimension
-xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
+xm_per_pix = 3.7 / 950  # meters per pixel in x dimension
 
 
 # Define a class to receive the characteristics of each line detection
@@ -12,6 +12,8 @@ class Line():
     def __init__(self):
         # was the line detected in the last iteration?
         self.detected = False
+        # past best_fits
+        self.past_fits = []
         # polynomial coefficients averaged over the last n iterations
         self.best_fit = None
         # radius of curvature of the line in some units
@@ -35,23 +37,26 @@ class Line():
 
     def update(self, best_fit, allx, ally):
         if self.best_fit is None:
-            prev_fit = best_fit
             diff = None
         else:
-            prev_fit = self.best_fit
             diff = best_fit - self.best_fit
 
         if diff is not None and np.sum(np.square(diff)) > 20e3:
             print('Diff::', np.sum(np.square(diff)))
             self.detected = False
             return
+        else:
+            self.past_fits.append(best_fit)
+            self.past_fits = self.past_fits[-8:]
 
-        self.best_fit = (best_fit + prev_fit) / 2
+        self.detected = True
+        if len(self.past_fits) > 1:
+            self.best_fit = np.mean(np.array(self.past_fits), axis=0)
+        else:
+            self.best_fit = self.past_fits[0]
 
         self.allx = allx
         self.ally = ally
-
-        self.detected = True
 
     def curvature(self, h):
         fitx, y_eval, ploty = self._fit(h)
