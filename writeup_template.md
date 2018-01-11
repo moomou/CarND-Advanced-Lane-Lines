@@ -116,11 +116,7 @@ I verified that my perspective transform was working as expected by drawing by v
 
 The actual lane detection code lives in helper2.py `detect_lane`.
 
-This functions applies the histogram search as suggested in the lectures with some additional processing. The additional processing include connected component analysis to remove small blobs of visual artifacts from the binary thresholding.
-
-![Component Analysis](asset/cc_analysis.png)
-
-Moreover, the `detect_lane` method attempts to reuse the fitted for lane search as long as the newly detected polynomial difference with last detected ones are not too big. This is a manually tuned threshold and is set at 20e3.
+This functions applies the histogram search as suggested in the lectures with some additional processing. Moreover, the `detect_lane` method attempts to reuse the fitted for lane search as long as the newly detected polynomial difference with last detected ones are not too big. This is a manually tuned threshold and is set at 20e3.
 
 ![Histogram search](asset/histo.png)
 
