@@ -144,7 +144,7 @@ For video analysis, I kept the last 5 estimates after rejecting outliers to keep
 
 Here is an example of the lane detection pipe output.
 
-![Example](asset/output.jpg)
+![Example](asset/output.png)
 
 ---
 
