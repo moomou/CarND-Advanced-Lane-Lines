@@ -132,7 +132,7 @@ Briefly, I adopted the following conversion factors.
 ```
 # Define conversions in x and y from pixels space to meters
 ym_per_pix = 15 / 720  # meters per pixel in y dimension
-xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
+xm_per_pix = 3.7 / 950 # meters per pixel in x dimension
 ```
 
 I then calculated the curvature using the formulat provided from the fitted polynomial.
