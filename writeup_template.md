@@ -65,7 +65,10 @@ As can be clearly seen, the edges of the chessboard is now straight; this valida
 
 Here is an example of the distortion correction on a sample image.
 
+### Original
 ![Example](asset/orig.png)
+
+### Undistorted
 ![Undistorted](asset/undistortion.png)
 
 
