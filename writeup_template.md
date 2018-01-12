@@ -110,7 +110,7 @@ I verified that my perspective transform was working as expected by drawing by v
 
 ![Bird Eye View](asset/unwarped_region.png)
 
-![Final Result](asset/final.png)
+![Final Result](asset/final.jpg)
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
