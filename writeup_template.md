@@ -63,6 +63,12 @@ Here is the undistored image using `cv2.undistort`
 
 As can be clearly seen, the edges of the chessboard is now straight; this validates the undistortion step is completed correctly.
 
+Here is an example of the distortion correction on a sample image.
+
+![Example](asset/orig.png)
+![Undistorted](asset/undistortion.png)
+
+
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
