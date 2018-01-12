@@ -87,25 +87,41 @@ def lane_pipe(rgb_img, state_id=None, debug_lv=0):
         right_lane = state.get('right_lane') or Line()
 
     h, w, chan = rgb_img.shape
-    region = np.array([
-        # top left
-        (int(w / 2) - 100, int(h / 2) + 100),
-        # top right
-        (int(w / 2) + 100, int(h / 2) + 100),
-        # bottom right
-        (int(w * 0.9), int(h * 0.95)),
-        # bottom left
-        (int(w * 0.1), int(h * 0.95)),
-    ])
+
+    if debug_lv >= 1:
+        region = np.array([
+            # top left
+            (int(w / 2) - 70, int(h / 2) + 100),
+            # top right
+            (int(w / 2) + 70, int(h / 2) + 100),
+            # bottom right
+            (int(w * 0.85), int(h * 0.95)),
+            # bottom left
+            (int(w * 0.17), int(h * 0.95)),
+        ])
+    else:
+        region = np.array([
+            # top left
+            (int(w / 2) - 100, int(h / 2) + 100),
+            # top right
+            (int(w / 2) + 100, int(h / 2) + 100),
+            # bottom right
+            (int(w * 0.9), int(h * 0.95)),
+            # bottom left
+            (int(w * 0.1), int(h * 0.95)),
+        ])
 
     undistorted = img = helper2.undistort_img(rgb_img)
-    # img = helper.gaussian_blur(img, 5)
+    if debug_lv >= 1:
+        cv2.imwrite('original.png', cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR))
+        cv2.imwrite('undistortion.png', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+
     img = helper2.edge_detection(img, debug_lv=debug_lv)
 
     cv2.imwrite('edge_detection.png', img)
     img = helper.region_of_interest(img, [region])
 
-    cv2.imwrite('region.png', img)
+    cv2.imwrite('region.png', helper.region_of_interest(rgb_img, [region]))
 
     img, M, inv_M = helper2.bird_eye_view(img, region.astype('float32'), w, h)
 
@@ -115,7 +131,6 @@ def lane_pipe(rgb_img, state_id=None, debug_lv=0):
     img = helper2.draw_lanes(undistorted, img, inv_M, left_lane, right_lane, w,
                              h)
     # cv2.imwrite('unwarped.png', img)
-
     curavture_rad = left_lane.curvature(h) + right_lane.curvature(h)
     center_offset = np.abs(w / 2 -
                            (left_lane.base_x(h) + right_lane.base_x(h)) / 2)
@@ -137,6 +152,9 @@ def process_image(output_root='./output_images',
     test_imgs = os.listdir(img_root)
 
     for path in test_imgs:
+        if not path.endswith('jpg'):
+            continue
+
         img = mpimg.imread(os.path.join(img_root, path))
         img = lane_pipe(img, debug_lv=debug_lv)
 

@@ -133,33 +133,15 @@ def undistort_img(img):
     mtx = cam_cal['mtx']
     dist = cam_cal['dist']
 
-    return cv2.undistort(img, mtx, dist, None, None)
+    return cv2.undistort(img, mtx, dist, None, mtx)
 
 
-def distort_img(img):
-    mtx = cam_cal['mtx']
-    dist = cam_cal['dist']
-
-    # http://answers.opencv.org/question/98929/trying-to-re-distort-image-points-using-projectpoints/
-    x, y = img[:, 0], img[:, 1]
-    print(x.shape)
-    print(y.shape)
-    x = (x - mtx[0, 2]) / mtx[0, 0]
-    y = (x - mtx[1, 2]) / mtx[1, 1]
-    new_img = np.dstack([x, y, 1])
-
-    print(new_img.shape)
-    new_img = cv2.projectPoints(new_img,
-                                np.zeros((3, 1, cv2.CV_64F)),
-                                np.zeros((3, 1, cv2.CV_64F)), mtx, dis)
-
-    return new_img
-
-
-def bird_eye_view(img, src_corners, w, h, offset=10):
-    dst_corners = np.array([(offset, offset), (w - offset, offset),
-                            (w - offset, h - offset),
-                            (offset, h - offset)]).astype('float32')
+def bird_eye_view(img, src_corners, w, h, offset=250):
+    dst_corners = np.array([(offset, 0), (w - offset, 0), (w - offset, h),
+                            (offset, h)]).astype('float32')
+    print(img.shape)
+    print(src_corners)
+    print(dst_corners)
     M = cv2.getPerspectiveTransform(src_corners, dst_corners)
     inv_M = cv2.getPerspectiveTransform(dst_corners, src_corners)
     dst = cv2.warpPerspective(img, M, (w, h))

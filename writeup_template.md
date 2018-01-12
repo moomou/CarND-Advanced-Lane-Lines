@@ -108,9 +108,9 @@ Here is an example demonstrating the region.
 
 I verified that my perspective transform was working as expected by drawing by visualizing the warped images and that unwarped trapzoid aligns with lane correctly.
 
-![Warped](asset/warped.png)
+![Bird Eye View](asset/unwarped_region.png)
 
-![Unwarped](asset/unwarped.png)
+![Final Result](asset/final.png)
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
