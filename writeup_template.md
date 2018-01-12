@@ -106,7 +106,7 @@ I use a trapezoid region of interest from the first lane detection assignment an
 Here is an example demonstrating the region.
 ![Region](asset/region.png)
 
-I verified that my perspective transform was working as expected by drawing by visualizing the warped images and that unwarped trapzoid aligns with lane correctly.
+I verified that my perspective transform was working as expected by drawing by visualizing the bird's eye view images are nearly parallel on straight line sample and that unwarped trapzoid aligns with lane correctly.
 
 ![Bird Eye View](asset/unwarped_region.png)
 
